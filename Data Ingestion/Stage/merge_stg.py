@@ -171,7 +171,7 @@ df_amplitude=df_amplitude.drop(*columns_to_drop).na.fill(0)
 #Guardamos info procesada en bucket de STAGE
 df_amplitude.write\
      .format('parquet')\
-     .save(f's3://{recommendations_bucket}/data/stage/dt={str(first_day)}', mode='overwrite')
+     .save(f's3://{recommendations_bucket}/data/stage/splited_data/dt={str(first_day)}', mode='overwrite')
 
 #DELETE $FOLDER$
 
