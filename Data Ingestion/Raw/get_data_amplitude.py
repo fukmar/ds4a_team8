@@ -124,12 +124,9 @@ print('Ultimo dia',last_day)
 files_objets_amplitude = list_objects_function(bucket_amplitude_data, first_day, last_day ,path_key_amplitude)
 
 print(f'Hay {len(files_objets_amplitude)} archivos de survival en la carpeta')
-#df_amplitude = spark.read.parquet(*files_objets_amplitude).select(['user_id',"os_name","event_type","event_time"])
-df_amplitude = spark.read.parquet(*files_objets_amplitude)
-print('ANTES DE LIMPIEZA')
-print(df.dtypes)
-print(df.count(),len(df.columns))
-df_amplitude=df_amplitude.select(['user_id',"os_name","event_type","event_time"])
+
+df_amplitude = spark.read.parquet(*files_objets_amplitude).select(['user_id',"os_name","event_type","event_time"])
+
 df_amplitude=df_amplitude.filter(df_amplitude.event_type.isin(eventos_recommendations))
 
 df_amplitude = df_amplitude.withColumn('year_month', F.date_format(df_amplitude.event_time,'YYYY-MM'))
@@ -148,36 +145,31 @@ df_amplitude = (df_amplitude
       .na.fill(0)
       )
 
-print('DESPUES DE LIMPIEZA')
-print(df.dtypes)
-print(df.count(),len(df.columns))
 
-#df_amplitude.write\
-#     .format('parquet')\
-#     .save(f's3://{recommendations_bucket}/data/raw/amplitude/dt={str(first_day)}', mode='overwrite')
-
-#print('Ubicación files', f's3://{recommendations_bucket}/data/raw/amplitude/dt={str(first_day)}')
+df_amplitude.write\
+     .format('parquet')\
+     .save(f's3://{recommendations_bucket}/data/raw/amplitude/dt={str(first_day)}', mode='overwrite')
+print('Ubicación files', f's3://{recommendations_bucket}/data/raw/amplitude/dt={str(first_day)}')
 
 #DELETE $FOLDER$
+def retrieve_files(path, file_type, list_dates):
+    bucket=path.split('/')[2]
+    prefix='/'.join(path.split('/')[3:])
+    list_objects=list(s3.Bucket(bucket).objects.all())
+    list_objects=[f's3://{bucket}/{i.key}' for i in list_objects if ((i.key.find(prefix)>=0) & any(x in i.key.lower() for x in list_dates) & (i.key.find(file_type)>=0))]
+    return list_objects
 
-#def retrieve_files(path, file_type, list_dates):
-#    bucket=path.split('/')[2]
-#    prefix='/'.join(path.split('/')[3:])
-#    list_objects=list(s3.Bucket(bucket).objects.all())
-#    list_objects=[f's3://{bucket}/{i.key}' for i in list_objects if ((i.key.find(prefix)>=0) & any(x in i.key.lower() for x in list_dates) & (i.key.find(file_type)>=0))]
-#    return list_objects
-#
-#
-#delete_files = retrieve_files(path=f's3://{recommendations_bucket}/data/', file_type='$folder$', list_dates=['$folder$'])
-#print('Files to delete', delete_files)
-#files_keys=[]
-#for i in range(0,len(delete_files)):
-#    files_keys=files_keys+[{'Key':('/').join(delete_files[i].split('/')[3:])}]
-#if len(files_keys)>0:
-#    s3_client.delete_objects(Bucket=recommendations_bucket,
-#                             Delete={'Objects':files_keys})
-#del delete_files
-#gc.collect()
-#
-#print(df_amplitude.show())
-#print((df_amplitude.count(), len(df_amplitude.columns)))
+
+delete_files = retrieve_files(path=f's3://{recommendations_bucket}/data/', file_type='$folder$', list_dates=['$folder$'])
+print('Files to delete', delete_files)
+files_keys=[]
+for i in range(0,len(delete_files)):
+    files_keys=files_keys+[{'Key':('/').join(delete_files[i].split('/')[3:])}]
+if len(files_keys)>0:
+    s3_client.delete_objects(Bucket=recommendations_bucket,
+                             Delete={'Objects':files_keys})
+del delete_files
+gc.collect()
+
+print(df_amplitude.show())
+print((df_amplitude.count(), len(df_amplitude.columns)))
